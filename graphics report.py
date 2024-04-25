@@ -1,65 +1,69 @@
+
 import sqlite3
-from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 
-def plot_results(results, title):
-    if not results:
-        print("Нет данных для отображения.")
-        return
+def fetch_data():
+    # Подключаемся к базе данных
+    conn = sqlite3.connect('easy_habit.db')
+    cur = conn.cursor()
 
-    user_ids = [result[0] for result in results]
-    habit_ids = [result[1] for result in results]
-    frequencies = [result[2] for result in results]
-    required_counts = [result[3] for result in results]
-    total_marks = [result[4] for result in results]
+    # Определяем текущий день и начало недели (понедельник)
+    today = datetime.now().date()
+    start_of_week = today - timedelta(days=today.weekday())  # Понедельник этой недели
 
-    completion_percentages = []
-    for frequency, marks, required in zip(frequencies, total_marks, required_counts):
-        if frequency == 'ежедневно':
-            expected_count = 7 * required  # Assuming a full week
-        elif frequency == 'еженедельно':
-            expected_count = required
-        else:  # ежемесячно
-            expected_count = required
-        completion_percentages.append(min(100, (marks / expected_count) * 100))
+    # Выборка активных ежедневных привычек
+    cur.execute('''
+        SELECT uh.id, uh.frequency_count, h.name
+        FROM user_habit uh JOIN habit h ON uh.habit_id = h.id
+        WHERE uh.active = 1 AND uh.frequency_name = 'ежедневно'
+    ''')
+    habits = cur.fetchall()
 
-    plt.figure(figsize=(10, 6))
-    plt.barh(range(len(completion_percentages)), completion_percentages, color='skyblue')
-    plt.xlabel('Процент выполнения')
-    plt.title(title)
-    plt.yticks(range(len(completion_percentages)), [f'User {uid}, Habit {hid}' for uid, hid in zip(user_ids, habit_ids)])
-    plt.show()
+    # Словарь для данных
+    data = {habit[0]: {'name': habit[2], 'goal': habit[1], 'actuals': [0]*((today - start_of_week).days + 1), 'dates': [(start_of_week + timedelta(days=i)).isoformat() for i in range((today - start_of_week).days + 1)]} for habit in habits}
 
-# Подключение к базе данных
-conn = sqlite3.connect('easy_habit.db')
-cursor = conn.cursor()
+    # Получаем историю выполнения для каждой привычки
+    for habit_id in data:
+        cur.execute('''
+            SELECT mark_date, SUM(mark_count)
+            FROM user_habit_history
+            WHERE habit_id = ? AND mark_date BETWEEN ? AND ?
+            GROUP BY mark_date
+            ORDER BY mark_date
+        ''', (habit_id, start_of_week, today))
+        results = cur.fetchall()
+        for result in results:
+            index = (datetime.strptime(result[0], '%Y-%m-%d').date() - start_of_week).days
+            data[habit_id]['actuals'][index] = result[1]
 
-# Определение дат для анализа
-today = datetime.now()
-start_last_week = (today - timedelta(days=today.weekday() + 7)).date()
-end_last_week = start_last_week + timedelta(days=6)  # Removed .date() here
+    conn.close()
+    return data
 
-start_last_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1).date()
-end_last_month = (today.replace(day=1) - timedelta(days=1))  # Removed .date() here
+def plot_data(data):
+    for habit_id, info in data.items():
+        fig, ax = plt.subplots()
+        x = range(len(info['dates']))
+        width = 0.35
 
-# Формирование и выполнение SQL-запросов для недели и месяца
-queries = {
-    'last_week': ('Прошлая неделя', start_last_week.strftime('%Y-%m-%d'), end_last_week.strftime('%Y-%m-%d')),
-    'last_month': ('Прошлый месяц', start_last_month.strftime('%Y-%m-%d'), end_last_month.strftime('%Y-%m-%d'))
-}
+        # Создаем столбцы для графика
+        ax.bar(x, [info['goal']] * len(info['dates']), width, label='Цель', color='silver', align='center')
+        ax.bar([p + width for p in x], info['actuals'], width, label='Выполнено', color='darksalmon', align='center')
 
-for key, (title, start_date, end_date) in queries.items():
-    query = '''
-    SELECT uh.user_id, uh.habit_id, uh.frequency_name, uh.frequency_count, SUM(hh.mark_count) as total_marks
-    FROM user_habit uh
-    JOIN habit h ON uh.habit_id = h.id
-    JOIN user_habit_history hh ON uh.user_id = hh.user_id AND uh.habit_id = hh.habit_id
-    WHERE hh.mark_date BETWEEN ? AND ? AND uh.active = 1
-    GROUP BY uh.user_id, uh.habit_id
-    '''
-    cursor.execute(query, (start_date, end_date))
-    results = cursor.fetchall()
-    plot_results(results, f'Выполнение привычек за {title}')
+        # Устанавливаем метки и заголовки
+        ax.set_xlabel('Дата')
+        ax.set_ylabel('Количество выполнений')
+        ax.set_title(f'Выполнение привычки: {info["name"]} за эту неделю')
+        ax.set_xticks([p + width / 2 for p in x])
+        ax.set_xticklabels(info['dates'], rotation=45)  # Поворачиваем даты для лучшей читаемости
+        ax.set_ylim(0, 10)  # Максимальное значение Y
 
-# Закрытие соединения с базой данных
-conn.close()
+        # Добавляем легенду
+        ax.legend()
+
+        # Показываем график
+        plt.show()
+
+# Запускаем функции
+data = fetch_data()
+plot_data(data)
