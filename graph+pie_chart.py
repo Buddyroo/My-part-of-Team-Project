@@ -83,6 +83,36 @@ def plot_data(data):
         ax.legend()
         plt.show()  # Показываем график после сохранения
 
+
+import matplotlib.pyplot as plt
+
+
+def plot_pie_chart(data):
+    fig, axs = plt.subplots(1, len(data), figsize=(15, 5))
+
+    # Define the color palette for the charts
+    colors = ['darksalmon', 'silver']  # You can choose your own colors
+
+    for i, (habit_id, info) in enumerate(data.items()):
+        total_goal = info['goal'] * len(info['dates'])  # Общая цель за весь период
+        total_actuals = sum(info['actuals'])  # Считаем общее количество выполнений за период
+        percentage = (total_actuals / total_goal) * 100  # Вычисляем процент выполнения цели
+
+        # Строим круговую диаграмму
+        axs[i].pie([percentage, 100 - percentage],
+                   labels=[f'Выполнено: {total_actuals}', f'Осталось: {total_goal - total_actuals}'], autopct='%1.1f%%',
+                   startangle=90, colors=colors)
+        axs[i].set_title(info['name'])
+
+    # Ensure the directory exists
+    os.makedirs('saved_charts', exist_ok=True)
+
+    # Save the figure
+    plt.savefig('saved_charts/pie_charts.png')  # Saves the plot as a PNG file
+    plt.show()  # Display the plot before closing
+    plt.close(fig)  # Close the figure to free up memory
+
 # Запускаем функции
 data = fetch_data()
 plot_data(data)
+plot_pie_chart(data)
