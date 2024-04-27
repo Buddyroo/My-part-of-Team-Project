@@ -148,4 +148,4 @@ def send_chart(chat_id, period):
         with open(file_path, 'rb') as photo:
             period_text = 'неделю' if period == 'week' else 'месяц'
             bot.send_photo(chat_id, photo, caption=f"Прогресс выполнения привычек за {period_text}")
-    os.remove(file_path)
+    os.remove(file_path) # Удаляем файл с графиком
