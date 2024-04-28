@@ -4,12 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta
 import numpy as np
 import os
-#import telebot
-
-
-# Создайте экземпляр бота, используя ваш токен API
-#TOKEN = '7103499485:AAGk8yDufpnS8HpCEv04V9v-ruqgcCtxN90'
-#bot = telebot.TeleBot(TOKEN)
+import telebot
 
 
 def fetch_progress_data(user_id, period):
@@ -35,13 +30,11 @@ def fetch_progress_data(user_id, period):
     ''', (start_date, end_date, user_id))
 
     habits = cur.fetchall()
-    print(habits)
     conn.close()
 
     # Проверяем, есть ли подключенные привычки
     if not habits:  # Если список привычек пуст
-        print("Нет активных привычек для данного пользователя.")
-        return None  # Возвращаем None, если нет активных привычек
+        return None
 
     results = {}
     for habit in habits:
@@ -66,20 +59,12 @@ def plot_progress_chart(user_id, period):
         return None
     data, start_date, end_date = fetch_progress_data(user_id, period)
     names = list(data.keys())
-    print(names)
-    print(len(names))
     percentages = [data[name]['percentage_done'] for name in names]
 
     fig, ax = plt.subplots(figsize=(10, max(5, len(names) * 0.8)))  # Увеличиваем высоту фигуры
 
     bar_height = 0.1  # Фиксированная ширина столбцов
     y_positions = np.arange(0.15, 0.15 + len(names) * 0.2, 0.2)[:len(names)]
-    print (y_positions)
-
-    print("Размеры массивов:")
-    print("y_positions:", len(y_positions))
-    print("[100] * len(names):", len([100] * len(names)))
-    print("percentages:", len(percentages))
 
     goals = ax.barh(y_positions, [100] * len(names), color='silver', label='Цель', height=bar_height)
     progress_bars = ax.barh(y_positions, percentages, color='darksalmon', label='Выполнено', height=bar_height)
@@ -87,13 +72,14 @@ def plot_progress_chart(user_id, period):
     ax.set_yticks([y for y in y_positions])  # Центрируем названия привычек
 
     ax.invert_yaxis()  # Начинаем снизу
-    ax.set_xlabel('Процент выполнения', color = "dimgray", fontweight='bold')
+    ax.set_xlabel('Процент выполнения', color="dimgray", fontweight='bold')
     ax.set_title(
-        f'Прогресс выполнения привычек за {"неделю" if period == "week" else "месяц"} с {start_date} по {end_date}',pad =20, color = "dimgray", fontweight='bold', fontsize = 14)
+        f'Прогресс выполнения привычек за {"неделю" if period == "week" else "месяц"} с {start_date} по {end_date}',
+        pad=20, color="dimgray", fontweight='bold', fontsize=14)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
     legend = ax.legend(loc='upper right')  # Перемещаем легенду в правый верхний угол
     for text in legend.get_texts():
-        text.set_color('dimgray')  # Change the color of legend text
+        text.set_color('dimgray')  # Изменяем цвет текста легенды
         text.set_fontweight('bold')
 
     # Добавляем вертикальные линии и меняем цвет осей
@@ -112,70 +98,55 @@ def plot_progress_chart(user_id, period):
 
     # Расширяем ось X для дополнительного пространства
     ax.set_xlim(0, 100)
-    # Set Y-axis height to be 0.5 units above the last bar
+    # На оси У сверху последней привычки добавляется пространство в 0.5 единиц
     ax.set_ylim(0, y_positions[-1] + 0.5)
 
-    # Adding text inside the progress bars
+    # Добавляем текст внутри красного столбца прогресса
     for bar, percentage in zip(progress_bars, percentages):
         if f'{percentage:.1f}%' == '0.0%':
-            x_position = max(bar.get_width(), 1)  # Используем минимальную ширину 1 для отображения текста внутри серого столбца
-            ax.text(x_position, bar.get_y() + bar.get_height() / 2, f'{percentage:.1f}%', ha='left', va='center', color='dimgrey',
+            x_position = max(bar.get_width(),
+                             1)  # Используем минимальную ширину 1 для отображения текста внутри серого столбца
+            ax.text(x_position, bar.get_y() + bar.get_height() / 2, f'{percentage:.1f}%', ha='left', va='center',
+                    color='dimgrey',
                     fontweight='bold')
         else:
             ax.text(bar.get_width(), bar.get_y() + bar.get_height() / 2, f'{percentage:.1f}%', ha='right', va='center',
-                color='dimgrey', fontweight='bold')
-        # Adding text inside the bars
-        # Adding text inside the goals bars
+                    color='dimgrey', fontweight='bold')
+
+    # Добавляем текст процентов внутри серых столбцов цели (всегда 100 процентов)
     for bar, goal, percentage in zip(goals, [100] * len(names), percentages):
         # Условие для добавления текста только если фактическое выполнение не 100%, иначе текст уже есть на красной полосе
         if f'{percentage:.1f}%' != '100.0%':
             ax.text(bar.get_width(), bar.get_y() + bar.get_height() / 2, f'{goal}%', ha='right', va='center',
                     color='dimgrey', fontweight='bold')
-        # Adjust the margins
-        plt.subplots_adjust(top=0.85, bottom=0.15)  # Fine-tune the subplot margins
+        # Редактируем края графика
+        plt.subplots_adjust(top=0.85, bottom=0.15)  # Увеличиваем верхнюю и нижнюю границы графика
 
-        # Сохраняем график
-
-        # Определите относительный путь к папке для сохранения изображений в вашем проекте
-        # Например, если папка для сохранения называется 'saved_charts' и находится в корне проекта
+    # Сохраняем график
+    # Определяем относительный путь к папке для сохранения изображений
     save_path = os.path.join(os.path.dirname(__file__), 'saved_charts')
 
-    # Убедитесь, что папка существует, если нет - создайте её
+    # Если папка не существует, то создаем ее
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    # Создайте полный путь к файлу
+    # Получаем полный путь к файлу
     full_file_path = os.path.join(save_path, f'progress_chart_{period}, {user_id}.png')
     fig.savefig(full_file_path)  # Сохраняем график
 
     plt.close(fig)  # Закрываем фигуру после сохранения, чтобы освободить память
 
-    #plt.show()
+    # plt.show() #Показываем график в консоли, если нужно проверить
 
     return full_file_path
 
 
-
-
-# Пример вызова функции
-plot_progress_chart(1111111111, 'week')
-plot_progress_chart(1111111111, 'month')
-
-#TELEGRAM
-
 def send_chart(chat_id, period):
-    file_path = plot_progress_chart(user_id=chat_id, period = period)
+    file_path = plot_progress_chart(user_id=chat_id, period=period)
     if not file_path:
         bot.send_message(chat_id, "У Вас нет подключенных привычек")
     else:
         with open(file_path, 'rb') as photo:
             period_text = 'неделю' if period == 'week' else 'месяц'
             bot.send_photo(chat_id, photo, caption=f"Прогресс выполнения привычек за {period_text}")
-    os.remove(file_path)
-#@bot.message_handler(commands=['start'])
-#def start(message):
- #   chat_id = message.chat.id
-  #  send_chart(chat_id, 'week')
-   # send_chart(chat_id, 'month')
-
-#bot.polling()
+    os.remove(file_path)  # Удаляем файл с графиком
