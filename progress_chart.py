@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, timedelta
 import numpy as np
 import os
-import telebot
+
 
 
 
@@ -150,29 +150,25 @@ def plot_progress_chart(user_id, period):
 
 
 
-def get_file_path(chat_id, period):
-    file_path = plot_progress_chart(user_id=chat_id, period=period)
-    if not file_path:
-        bot.send_message(chat_id, "У Вас нет подключенных привычек")
-    else:
-        with open(file_path, 'rb') as photo:
-            period_text = 'неделю' if period == 'week' else 'месяц'
-            bot.send_photo(chat_id, photo, caption=f"Прогресс выполнения привычек за {period_text}")
+def get_file_path(user_id, period):
+    file_path = plot_progress_chart(user_id, period)
     return file_path  # Возвращаем file_path для функции удаления
 
 
-plot_progress_chart(1111111111, 'week')
-plot_progress_chart(1111111111, 'month')
 def delete_file(file_path):
     if os.path.exists(file_path):
         os.remove(file_path)  # Удаляем файл с графиком
-        print(f"Файл {file_path} успешно удален.")
-    else:
-        print("Файл для удаления не найден.")
+
+#plot_progress_chart(1111111111, 'week')
+#plot_progress_chart(1111111111, 'month')
+file_path_week =get_file_path(1111111111, 'week')
+file_path_month = get_file_path(1111111111, 'month')
+delete_file(file_path_week)
+delete_file(file_path_month)
 
 #Как нам ее вызывать:
 # Отправляем график и получаем путь к файлу
-#file_path = get_file_path(chat_id, period)
+#file_path = get_file_path(user_id, period)
 # Если график построен и путь к файлу есть, то удаляем его
 #if file_path:
  #   delete_file(file_path)
